@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>Socket.IO Chat</title>
+    <style>
+      body {
+        margin: 0;
+        padding-bottom: 3rem;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Helvetica, Arial, sans-serif;
+      }
+
+      #form {
+        background: rgba(0, 0, 0, 0.15);
+        padding: 0.25rem;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        display: flex;
+        height: 3rem;
+        box-sizing: border-box;
+        backdrop-filter: blur(10px);
+      }
+      #input {
+        border: none;
+        padding: 0 1rem;
+        flex-grow: 1;
+        border-radius: 2rem;
+        margin: 0.25rem;
+      }
+      #input:focus {
+        outline: none;
+      }
+      #form > button {
+        background: #333;
+        border: none;
+        padding: 0 1rem;
+        margin: 0.25rem;
+        border-radius: 3px;
+        outline: none;
+        color: #fff;
+      }
+
+      #messages {
+        list-style-type: none;
+        margin: 0;
+        padding: 0;
+      }
+      #messages > li {
+        padding: 0.5rem 1rem;
+      }
+      #messages > li:nth-child(odd) {
+        background: #efefef;
+      }
+    </style>
+  </head>
+  <body>
+    <ul id="messages"></ul>
+    <form id="form" action="">
+      <input id="input" autocomplete="off" /><button>Send</button>
+    </form>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      const socket = io();
+
+      const form = document.getElementById("form");
+      const input = document.getElementById("input");
+      const messages = document.getElementById("messages");
+
+      form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        if (input.value) {
+          /*
+            SCENARIO 1 (Client-Server): 
+            Emit a "chat message" event to the server. The message from the input field is passed as the payload.
+            The server will listen for this event and broadcast it to all clients.
+          */
+          socket.emit("chat message", input.value);
+
+          /*
+            SCENARIO 2 (Client-Server): 
+            Emit a "message with callback" event to the server. 
+            This event includes a callback function which the server will call after receiving the message.
+            The callback allows us to handle the server's response in a request-response manner.
+          */
+          socket
+            .timeout(5000) // Timeout of 5 seconds for receiving acknowledgment
+            .emit(
+              "message with callback",
+              { foo: "bar" }, // First argument
+              "baz", // Second argument
+              (err, response) => {
+                if (err) {
+                  // Handle case where the server did not respond within the specified timeout
+                  console.error("Server did not respond in time");
+                } else {
+                  // Handle server response
+                  console.log(response.status); // Expected output: 'ok'
+                }
+              }
+            );
+
+          input.value = ""; // Clear the input field after sending the message
+        }
+      });
+
+      /*
+        SCENARIO 1 (Server-Client): 
+        Listen for "chat message" events emitted by the server.
+        When the server broadcasts a chat message, display it in the messages list.
+      */
+      socket.on("chat message", (msg) => {
+        const item = document.createElement("li");
+        item.textContent = msg; // Set the message as the text content
+        messages.appendChild(item); // Append the new message to the list
+        window.scrollTo(0, document.body.scrollHeight); // Scroll to the bottom of the page to show the latest message
+      });
+
+      /*
+        SCENARIO 2 (Server-Client): 
+        Listen for "message with callback" events emitted by the server.
+        This event includes arguments from the server, and we call the callback to acknowledge it.
+      */
+      socket.on("message with callback", (arg1, arg2, callback) => {
+        console.log(arg1); // Example: { foo: 'bar' }
+        console.log(arg2); // Example: 'baz'
+
+        // Call the callback function to acknowledge the message
+        callback({
+          status: "ok", // Send an acknowledgment response
+        });
+      });
+    </script>
+  </body>
+</html>
